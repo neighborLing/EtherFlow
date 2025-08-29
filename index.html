@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>连接 MetaMask</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        button {
+            background-color: #f6851b;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #e2761b;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .account-info {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>MetaMask 连接示例</h1>
+    
+    <div id="status">
+        <p>请连接您的 MetaMask 钱包</p>
+    </div>
+    
+    <button id="connectBtn" onclick="connectWallet()">连接 MetaMask</button>
+    <button id="disconnectBtn" onclick="disconnectWallet()" style="display: none;">断开连接</button>
+    
+    <div id="accountInfo" class="account-info" style="display: none;">
+        <h3>账户信息</h3>
+        <p><strong>地址:</strong> <span id="accountAddress"></span></p>
+        <p><strong>余额:</strong> <span id="accountBalance"></span> ETH</p>
+    </div>
+
+    <script>
+        let currentAccount = null;
+
+        // 检查是否安装了 MetaMask
+        function checkMetaMask() {
+            if (typeof window.ethereum !== 'undefined') {
+                return true;
+            } else {
+                alert('请安装 MetaMask 插件');
+                return false;
+            }
+        }
+
+        // 连接钱包
+        async function connectWallet() {
+            if (!checkMetaMask()) return;
+
+            try {
+                const accounts = await window.ethereum.request({
+                    method: 'eth_requestAccounts'
+                });
+                
+                if (accounts.length > 0) {
+                    currentAccount = accounts[0];
+                    updateUI();
+                    await getBalance();
+                }
+            } catch (error) {
+                console.error('连接失败:', error);
+                document.getElementById('status').innerHTML = '<p style="color: red;">连接失败: ' + error.message + '</p>';
+            }
+        }
+
+        // 断开连接
+        function disconnectWallet() {
+            currentAccount = null;
+            updateUI();
+        }
+
+        // 获取余额
+        async function getBalance() {
+            if (!currentAccount) return;
+
+            try {
+                const balance = await window.ethereum.request({
+                    method: 'eth_getBalance',
+                    params: [currentAccount, 'latest']
+                });
+                
+                // 将 wei 转换为 ETH
+                const ethBalance = parseInt(balance, 16) / Math.pow(10, 18);
+                document.getElementById('accountBalance').textContent = ethBalance.toFixed(4);
+            } catch (error) {
+                console.error('获取余额失败:', error);
+                document.getElementById('accountBalance').textContent = '获取失败';
+            }
+        }
+
+        // 更新界面
+        function updateUI() {
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const accountInfo = document.getElementById('accountInfo');
+            const status = document.getElementById('status');
+
+            if (currentAccount) {
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'inline-block';
+                accountInfo.style.display = 'block';
+                document.getElementById('accountAddress').textContent = currentAccount;
+                status.innerHTML = '<p style="color: green;">已连接 MetaMask</p>';
+            } else {
+                connectBtn.style.display = 'inline-block';
+                disconnectBtn.style.display = 'none';
+                accountInfo.style.display = 'none';
+                status.innerHTML = '<p>请连接您的 MetaMask 钱包</p>';
+            }
+        }
+
+        // 监听账户变化
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', function (accounts) {
+                if (accounts.length > 0) {
+                    currentAccount = accounts[0];
+                    updateUI();
+                    getBalance();
+                } else {
+                    disconnectWallet();
+                }
+            });
+
+            // 监听网络变化
+            window.ethereum.on('chainChanged', function (chainId) {
+                console.log('网络已切换到:', chainId);
+                if (currentAccount) {
+                    getBalance();
+                }
+            });
+        }
+
+        // 页面加载时检查是否已连接
+        window.addEventListener('load', async function() {
+            if (checkMetaMask()) {
+                try {
+                    const accounts = await window.ethereum.request({
+                        method: 'eth_accounts'
+                    });
+                    if (accounts.length > 0) {
+                        currentAccount = accounts[0];
+                        updateUI();
+                        getBalance();
+                    }
+                } catch (error) {
+                    console.error('检查连接状态失败:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
