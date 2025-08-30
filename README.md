@@ -1,36 +1,143 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 区块链交互应用
 
-## Getting Started
+这是一个基于Next.js的区块链交互应用，支持转账功能和智能合约调用。
 
-First, run the development server:
+## 功能特性
+
+### 🔄 转账功能
+- 连接MetaMask钱包
+- 发送ETH到指定地址
+- 实时交易状态反馈
+
+### 📋 合约调用功能
+- 查看合约状态（消息、计数器、所有者）
+- 设置新消息
+- 增加计数器
+- 实时刷新合约状态
+
+### 🔍 区块链查询功能
+- 网络状态查询（区块号、Gas价格、链信息）
+- 交易详情查询（通过交易哈希）
+- 地址信息查询（余额、交易次数、合约检测）
+- 实时区块信息显示
+
+### 🎨 用户界面
+- 现代化的Tab切换界面（转账和合约调用）
+- 区块链查询功能独立显示在Tab下方
+- 响应式设计
+- 优雅的加载状态
+- 防抖输入处理
+
+## 技术栈
+
+- **前端框架**: Next.js 15.5.2
+- **区块链交互**: Ethers.js 6.15.0
+- **样式**: Tailwind CSS 4
+- **工具库**: Lodash
+- **类型检查**: TypeScript
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+npm install
+```
+
+### 2. 配置合约地址
+
+#### 方法一：环境变量配置
+在项目根目录创建 `.env.local` 文件：
+
+```env
+NEXT_PUBLIC_CONTRACT_ADDRESS=你的合约地址
+```
+
+#### 方法二：直接修改配置文件
+修改 `src/app/config/contract.ts` 文件中的地址。
+
+#### 方法三：界面配置（推荐）
+1. 连接钱包后，切换到"合约调用"标签页
+2. 在"合约配置"区域输入您的hello合约地址
+3. 点击"重新连接合约"按钮
+
+### 3. 启动开发服务器
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 4. 访问应用
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+打开 [http://localhost:3000](http://localhost:3000) 查看应用。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 使用说明
 
-## Learn More
+### 连接钱包
+1. 点击"连接钱包"按钮
+2. 在MetaMask中确认连接
+3. 确保钱包已连接到正确的网络
 
-To learn more about Next.js, take a look at the following resources:
+### 转账功能
+1. 切换到"转账功能"标签页
+2. 输入接收地址（0x开头的以太坊地址）
+3. 输入转账金额（ETH）
+4. 点击"执行转账"
+5. 在MetaMask中确认交易
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 合约调用功能
+1. 切换到"合约调用"标签页
+2. 查看当前合约状态
+3. 设置新消息或增加计数器
+4. 点击"刷新合约状态"更新显示
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 区块链查询功能
+1. 连接钱包后，区块链查询功能会自动显示在Tab下方
+2. 点击"获取信息"查看网络状态
+3. 输入交易哈希查询交易详情
+4. 输入地址查询余额和交易信息
+5. 使用"使用当前地址"快速查询当前钱包
 
-## Deploy on Vercel
+## 合约信息
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+本应用使用的智能合约包含以下功能：
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `setMessage(string _message)`: 设置新消息
+- `getMessage()`: 获取当前消息
+- `increment()`: 增加计数器
+- `getCount()`: 获取当前计数
+- `getOwner()`: 获取合约所有者
+
+## 注意事项
+
+1. 确保MetaMask已安装并连接到正确的网络
+2. 确保钱包中有足够的ETH支付gas费用
+3. 合约地址需要替换为实际部署的地址
+4. 建议在测试网络上先进行测试
+
+## 开发
+
+### 项目结构
+
+```
+src/
+├── app/
+│   ├── components/
+│   │   └── ContractInterface.tsx    # 主要交互组件
+│   ├── config/
+│   │   └── contract.ts              # 合约配置
+│   ├── layout.tsx
+│   └── page.tsx
+└── ...
+```
+
+### 代码规范
+
+- 所有接口以"I"开头
+- 使用lodash进行防抖处理
+- 函数参数超过2个时使用对象参数
+- 不使用分号结尾
+
+## 许可证
+
+MIT
