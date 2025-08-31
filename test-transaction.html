@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易查询功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        .container {
+            background-color: #2d2d2d;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background-color: #333;
+            color: #fff;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+        .result {
+            background-color: #333;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .error {
+            color: #ff6b6b;
+        }
+        .success {
+            color: #51cf66;
+        }
+    </style>
+</head>
+<body>
+    <h1>交易查询功能测试</h1>
+    
+    <div class="container">
+        <h2>连接钱包</h2>
+        <button id="connectBtn">连接 MetaMask</button>
+        <div id="walletStatus"></div>
+    </div>
+
+    <div class="container">
+        <h2>交易查询</h2>
+        <input type="text" id="txHash" placeholder="输入交易哈希 (0x...)" />
+        <button id="queryBtn" disabled>查询交易</button>
+        <div id="queryResult"></div>
+    </div>
+
+    <script type="module">
+        import { ethers } from 'https://cdn.ethers.io/lib/ethers-6.15.0.esm.min.js';
+
+        let provider = null;
+        let signer = null;
+
+        const connectBtn = document.getElementById('connectBtn');
+        const walletStatus = document.getElementById('walletStatus');
+        const queryBtn = document.getElementById('queryBtn');
+        const txHashInput = document.getElementById('txHash');
+        const queryResult = document.getElementById('queryResult');
+
+        // 连接钱包
+        connectBtn.addEventListener('click', async () => {
+            try {
+                if (typeof window.ethereum === 'undefined') {
+                    throw new Error('MetaMask未安装');
+                }
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                
+                const address = await signer.getAddress();
+                walletStatus.innerHTML = `<div class="success">钱包已连接: ${address}</div>`;
+                queryBtn.disabled = false;
+                connectBtn.disabled = true;
+            } catch (error) {
+                walletStatus.innerHTML = `<div class="error">连接失败: ${error.message}</div>`;
+            }
+        });
+
+        // 查询交易
+        queryBtn.addEventListener('click', async () => {
+            const txHash = txHashInput.value.trim();
+            
+            if (!txHash) {
+                queryResult.innerHTML = '<div class="error">请输入交易哈希</div>';
+                return;
+            }
+
+            if (!/^0x([A-Fa-f0-9]{64})$/.test(txHash)) {
+                queryResult.innerHTML = '<div class="error">无效的交易哈希格式</div>';
+                return;
+            }
+
+            queryBtn.disabled = true;
+            queryResult.innerHTML = '查询中...';
+
+            try {
+                // 获取交易收据
+                const receipt = await provider.getTransactionReceipt(txHash);
+                if (!receipt) {
+                    throw new Error('交易不存在或尚未被打包');
+                }
+
+                // 获取交易详情
+                const tx = await provider.getTransaction(txHash);
+                if (!tx) {
+                    throw new Error('无法获取交易详情');
+                }
+
+                // 获取区块信息
+                const block = await provider.getBlock(receipt.blockNumber);
+
+                // 格式化结果
+                const result = {
+                    hash: tx.hash,
+                    from: tx.from,
+                    to: tx.to || '合约调用',
+                    value: ethers.formatEther(tx.value),
+                    gasPrice: ethers.formatUnits(tx.gasPrice || 0, 'gwei'),
+                    gasLimit: tx.gasLimit?.toString() || '0',
+                    nonce: tx.nonce,
+                    blockNumber: receipt.blockNumber,
+                    blockHash: receipt.blockHash,
+                    timestamp: block?.timestamp || 0,
+                    confirmations: receipt.confirmations,
+                    status: receipt.status === 1 ? '成功' : '失败'
+                };
+
+                queryResult.innerHTML = `
+                    <div class="success">
+                        <h3>交易详情:</h3>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    </div>
+                `;
+            } catch (error) {
+                queryResult.innerHTML = `<div class="error">查询失败: ${error.message}</div>`;
+            } finally {
+                queryBtn.disabled = false;
+            }
+        });
+
+        // 示例交易哈希（以太坊主网上的真实交易）
+        const exampleTxHash = '0x88df016429689c079f3b2f6ad39fa052532c56795b733da78a91ebe6a713944b';
+        txHashInput.placeholder = `示例: ${exampleTxHash}`;
+    </script>
+</body>
+</html>

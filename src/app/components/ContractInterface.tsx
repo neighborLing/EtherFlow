@@ -21,6 +21,22 @@ interface IContractCallData {
   message: string
 }
 
+interface ITransactionData {
+  hash: string
+  from: string
+  to: string
+  value: string
+  gasPrice: string
+  gasLimit: string
+  nonce: number
+  data: string
+  blockNumber: number
+  blockHash: string
+  timestamp: number
+  confirmations: number | (() => Promise<number>)
+  status: number
+}
+
 const ContractInterface: React.FC<IContractInterfaceProps> = ({ 
   contractAddress = CONTRACT_CONFIG.address,
   contractABI = CONTRACT_CONFIG.abi
@@ -45,6 +61,12 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
   const [contractCallData, setContractCallData] = useState<IContractCallData>({
     message: ''
   })
+
+  // 交易查询状态
+  const [transactionHash, setTransactionHash] = useState('')
+  const [transactionData, setTransactionData] = useState<ITransactionData | null>(null)
+  const [transactionLoading, setTransactionLoading] = useState(false)
+  const [transactionError, setTransactionError] = useState('')
 
   // 钱包连接相关状态
   const { address, isConnected: wagmiConnected, chain } = useAccount()
@@ -234,6 +256,83 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
     }
   }
 
+  // 查询交易信息
+  const handleQueryTransaction = async () => {
+    if (!provider || !transactionHash.trim()) {
+      setTransactionError('请输入有效的交易哈希')
+      return
+    }
+
+    setTransactionLoading(true)
+    setTransactionError('')
+    setTransactionData(null)
+
+    try {
+      // 验证交易哈希格式
+      if (!/^0x([A-Fa-f0-9]{64})$/.test(transactionHash)) {
+        throw new Error('无效的交易哈希格式')
+      }
+
+      // 获取交易收据
+      const receipt = await provider.getTransactionReceipt(transactionHash)
+      if (!receipt) {
+        throw new Error('交易不存在或尚未被打包')
+      }
+
+      // 获取交易详情
+      const tx = await provider.getTransaction(transactionHash)
+      if (!tx) {
+        throw new Error('无法获取交易详情')
+      }
+
+      // 获取区块信息
+      const block = await provider.getBlock(receipt.blockNumber!)
+      
+             // 格式化交易数据
+       const formattedData: ITransactionData = {
+         hash: tx.hash,
+         from: tx.from,
+         to: tx.to || '',
+         value: ethers.formatEther(tx.value),
+         gasPrice: ethers.formatUnits(tx.gasPrice || 0, 'gwei'),
+         gasLimit: tx.gasLimit?.toString() || '0',
+         nonce: tx.nonce,
+         data: tx.data,
+         blockNumber: receipt.blockNumber!,
+         blockHash: receipt.blockHash,
+         timestamp: block?.timestamp || 0,
+         confirmations: typeof receipt.confirmations === 'function' ? await receipt.confirmations() : receipt.confirmations,
+         status: receipt.status || 0
+       }
+
+      setTransactionData(formattedData)
+      setOperationStatus({ type: 'success', message: '交易查询成功' })
+      setTimeout(() => setOperationStatus({ type: null, message: '' }), 3000)
+    } catch (error) {
+      console.error('查询交易失败:', error)
+      const errorMessage = error instanceof Error ? error.message : '查询交易失败'
+      setTransactionError(errorMessage)
+      setOperationStatus({ type: 'error', message: errorMessage })
+      setTimeout(() => setOperationStatus({ type: null, message: '' }), 3000)
+    } finally {
+      setTransactionLoading(false)
+    }
+  }
+
+  // 清空交易查询结果
+  const clearTransactionQuery = () => {
+    setTransactionHash('')
+    setTransactionData(null)
+    setTransactionError('')
+  }
+
+  // 复制到剪贴板
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setOperationStatus({ type: 'success', message: '已复制到剪贴板' })
+    setTimeout(() => setOperationStatus({ type: null, message: '' }), 2000)
+  }
+
   // 防抖处理
   const debouncedSetMessage = _.debounce((value: string) => {
     setContractCallData(prev => ({ ...prev, message: value }))
@@ -361,6 +460,180 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                       '执行转账'
                     )}
                   </button>
+                </div>
+              </div>
+
+              {/* 交易查询功能 */}
+              <div className="uniswap-card glass-hover">
+                <div className="flex items-center mb-6">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-indigo-500 rounded-xl flex items-center justify-center mr-4">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">交易查询</h2>
+                </div>
+                
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-3">
+                      交易哈希
+                    </label>
+                    <div className="flex space-x-3">
+                      <input
+                        type="text"
+                        value={transactionHash}
+                        onChange={(e) => setTransactionHash(e.target.value)}
+                        placeholder="0x..."
+                        className="uniswap-input flex-1"
+                      />
+                      <button
+                        onClick={handleQueryTransaction}
+                        disabled={transactionLoading || !provider}
+                        className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                        {transactionLoading ? (
+                          <div className="flex items-center">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            查询中
+                          </div>
+                        ) : (
+                          '查询'
+                        )}
+                      </button>
+                      {transactionData && (
+                        <button
+                          onClick={clearTransactionQuery}
+                          className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-105"
+                        >
+                          清空
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 错误提示 */}
+                  {transactionError && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-red-400 text-sm">{transactionError}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 交易详情显示 */}
+                  {transactionData && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-white mb-4">交易详情</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* 基本信息 */}
+                        <div className="space-y-3">
+                          <div className="bg-gray-800/50 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-400">交易哈希</span>
+                              <button
+                                onClick={() => copyToClipboard(transactionData.hash)}
+                                className="text-blue-400 hover:text-blue-300 text-sm"
+                              >
+                                复制
+                              </button>
+                            </div>
+                            <p className="text-sm text-white break-all">{transactionData.hash}</p>
+                          </div>
+
+                          <div className="bg-gray-800/50 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-400">发送方</span>
+                              <button
+                                onClick={() => copyToClipboard(transactionData.from)}
+                                className="text-blue-400 hover:text-blue-300 text-sm"
+                              >
+                                复制
+                              </button>
+                            </div>
+                            <p className="text-sm text-white break-all">{transactionData.from}</p>
+                          </div>
+
+                          <div className="bg-gray-800/50 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-400">接收方</span>
+                              <button
+                                onClick={() => copyToClipboard(transactionData.to)}
+                                className="text-blue-400 hover:text-blue-300 text-sm"
+                              >
+                                复制
+                              </button>
+                            </div>
+                            <p className="text-sm text-white break-all">{transactionData.to || '合约调用'}</p>
+                          </div>
+
+                          <div className="bg-gray-800/50 rounded-xl p-4">
+                            <span className="text-sm font-medium text-gray-400 block mb-2">转账金额</span>
+                            <p className="text-lg font-bold text-green-400">{transactionData.value} ETH</p>
+                          </div>
+                        </div>
+
+                        {/* 交易状态和区块信息 */}
+                        <div className="space-y-3">
+                          <div className="bg-gray-800/50 rounded-xl p-4">
+                            <span className="text-sm font-medium text-gray-400 block mb-2">交易状态</span>
+                            <div className="flex items-center">
+                              <div className={`w-3 h-3 rounded-full mr-2 ${
+                                transactionData.status === 1 ? 'bg-green-400' : 'bg-red-400'
+                              }`}></div>
+                              <span className={`text-sm font-semibold ${
+                                transactionData.status === 1 ? 'text-green-400' : 'text-red-400'
+                              }`}>
+                                {transactionData.status === 1 ? '成功' : '失败'}
+                              </span>
+                            </div>
+                          </div>
+
+                                                     <div className="bg-gray-800/50 rounded-xl p-4">
+                             <span className="text-sm font-medium text-gray-400 block mb-2">区块信息</span>
+                             <p className="text-sm text-white">区块号: {transactionData.blockNumber}</p>
+                             <p className="text-sm text-white">确认数: {typeof transactionData.confirmations === 'function' ? '计算中...' : transactionData.confirmations}</p>
+                             {transactionData.timestamp > 0 && (
+                               <p className="text-sm text-white">
+                                 时间: {new Date(transactionData.timestamp * 1000).toLocaleString()}
+                               </p>
+                             )}
+                           </div>
+
+                          <div className="bg-gray-800/50 rounded-xl p-4">
+                            <span className="text-sm font-medium text-gray-400 block mb-2">Gas 信息</span>
+                            <p className="text-sm text-white">Gas 价格: {transactionData.gasPrice} Gwei</p>
+                            <p className="text-sm text-white">Gas 限制: {transactionData.gasLimit}</p>
+                          </div>
+
+                          <div className="bg-gray-800/50 rounded-xl p-4">
+                            <span className="text-sm font-medium text-gray-400 block mb-2">Nonce</span>
+                            <p className="text-sm text-white">{transactionData.nonce}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 交易数据 */}
+                      {transactionData.data && transactionData.data !== '0x' && (
+                        <div className="bg-gray-800/50 rounded-xl p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-gray-400">交易数据</span>
+                            <button
+                              onClick={() => copyToClipboard(transactionData.data)}
+                              className="text-blue-400 hover:text-blue-300 text-sm"
+                            >
+                              复制
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-300 break-all font-mono">{transactionData.data}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
