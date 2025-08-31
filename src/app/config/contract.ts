@@ -1,7 +1,7 @@
 // 合约配置文件
 export const CONTRACT_CONFIG = {
   // 合约地址 - 需要替换为实际部署的地址
-  address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x2833ea9e5b945fA3C35019A97aC0341c28B79180',
+  address: process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x23C1684494DaBE62458154757301bD86B46DaCa5',
   
   // 合约ABI
   abi: [

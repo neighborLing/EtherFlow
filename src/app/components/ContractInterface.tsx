@@ -5,6 +5,7 @@ import { ethers } from 'ethers'
 import _ from 'lodash'
 import { CONTRACT_CONFIG } from '../config/contract'
 import { useAccount, useEnsName, useEnsAvatar } from 'wagmi'
+import ContractEvents from './ContractEvents'
 
 interface IContractInterfaceProps {
   contractAddress?: string
@@ -24,7 +25,7 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
   contractAddress = CONTRACT_CONFIG.address,
   contractABI = CONTRACT_CONFIG.abi
 }) => {
-  const [activeTab, setActiveTab] = useState<'transfer' | 'contract'>('transfer')
+  const [activeTab, setActiveTab] = useState<'transfer' | 'contract' | 'events'>('transfer')
   const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null)
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null)
   const [contract, setContract] = useState<ethers.Contract | null>(null)
@@ -303,6 +304,12 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
               >
                 📄 合约调用
               </button>
+              <button
+                onClick={() => setActiveTab('events')}
+                className={`uniswap-tab ${activeTab === 'events' ? 'active' : ''}`}
+              >
+                📊 事件查询
+              </button>
             </div>
           </div>
 
@@ -510,6 +517,11 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                 </button>
               </div>
             </div>
+          )}
+
+          {/* 事件查询Tab内容 */}
+          {activeTab === 'events' && (
+            <ContractEvents contractAddress={customContractAddress || contractAddress} />
           )}
         </>
       )}
