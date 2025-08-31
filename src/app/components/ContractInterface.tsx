@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { ethers } from 'ethers'
 import _ from 'lodash'
 import { CONTRACT_CONFIG } from '../config/contract'
 import { useAccount, useEnsName, useEnsAvatar } from 'wagmi'
-import ContractEvents from './ContractEvents'
+import ContractEvents, { IContractEventsRef } from './ContractEvents'
 
 interface IContractInterfaceProps {
   contractAddress?: string
@@ -25,7 +25,7 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
   contractAddress = CONTRACT_CONFIG.address,
   contractABI = CONTRACT_CONFIG.abi
 }) => {
-  const [activeTab, setActiveTab] = useState<'transfer' | 'contract' | 'events'>('transfer')
+  const [activeTab, setActiveTab] = useState<'transfer' | 'contract'>('transfer')
   const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null)
   const [signer, setSigner] = useState<ethers.JsonRpcSigner | null>(null)
   const [contract, setContract] = useState<ethers.Contract | null>(null)
@@ -54,7 +54,8 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
     type: 'success' | 'error' | null
     message: string
   }>({ type: null, message: '' })
-  const [customContractAddress, setCustomContractAddress] = useState('')
+  const [customContractAddress, setCustomContractAddress] = useState(CONTRACT_CONFIG.address)
+  const contractEventsRef = useRef<IContractEventsRef>(null)
 
   // 连接钱包
   const connectWallet = async () => {
@@ -151,6 +152,9 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
       setMessage(messageResult)
       setCount(Number(countResult))
       setOwner(ownerResult)
+      
+      // 同时刷新合约事件
+      contractEventsRef.current?.refresh()
     } catch (error) {
       console.error('获取合约状态失败:', error)
       // 设置默认值，避免显示空白
@@ -303,12 +307,6 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                 className={`uniswap-tab ${activeTab === 'contract' ? 'active' : ''}`}
               >
                 📄 合约调用
-              </button>
-              <button
-                onClick={() => setActiveTab('events')}
-                className={`uniswap-tab ${activeTab === 'events' ? 'active' : ''}`}
-              >
-                📊 事件查询
               </button>
             </div>
           </div>
@@ -506,7 +504,10 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                   </div>
                 </div>
               </div>
-
+              <ContractEvents 
+                ref={contractEventsRef}
+                contractAddress={customContractAddress} 
+              />
               {/* 刷新按钮 */}
               <div className="text-center">
                 <button
@@ -517,11 +518,6 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                 </button>
               </div>
             </div>
-          )}
-
-          {/* 事件查询Tab内容 */}
-          {activeTab === 'events' && (
-            <ContractEvents contractAddress={customContractAddress || contractAddress} />
           )}
         </>
       )}
