@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Read(//Users/meadery/Desktop/homework/20250824/my-hardhat-project/contracts/**)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []
