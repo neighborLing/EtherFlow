@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { ethers } from 'ethers'
 import _ from 'lodash'
+import { stringToHex } from 'viem'
 import { CONTRACT_CONFIG } from '../config/contract'
 import { useAccount, useEnsName, useEnsAvatar } from 'wagmi'
 import ContractEvents, { IContractEventsRef } from './ContractEvents'
@@ -15,6 +16,7 @@ interface IContractInterfaceProps {
 interface ITransferData {
   to: string
   amount: string
+  data: string
 }
 
 interface IContractCallData {
@@ -54,7 +56,8 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
   // 转账表单状态
   const [transferData, setTransferData] = useState<ITransferData>({
     to: '',
-    amount: ''
+    amount: '',
+    data: ''
   })
 
   // 合约调用表单状态
@@ -80,27 +83,45 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
   const contractEventsRef = useRef<IContractEventsRef>(null)
 
   // 连接钱包
+  /**
+   * 连接用户的钱包（如 MetaMask），并初始化 ethers 相关实例
+   * 步骤说明：
+   * 1. 检查 window.ethereum 是否存在，判断用户是否安装了 MetaMask
+   * 2. 创建 ethers 的 BrowserProvider 实例，用于与以太坊节点交互
+   * 3. 获取当前钱包的 signer（签名者），用于后续交易签名和合约交互
+   * 4. 根据用户输入的自定义合约地址或默认合约地址，创建合约实例
+   * 5. 将 provider、signer、contract 实例存入本地 state，标记已连接状态
+   * 6. 调用 fetchContractState 获取合约的初始状态
+   * 7. 错误处理：如果未检测到 MetaMask，则输出错误；如有异常则捕获并输出
+   */
   const connectWallet = async () => {
     try {
+      // 检查 MetaMask 是否已安装
       if (typeof window.ethereum !== 'undefined') {
+        // 创建 ethers 的 provider 实例（基于浏览器注入的 provider）
         const provider = new ethers.BrowserProvider(window.ethereum)
+        // 获取当前连接钱包的 signer（签名者）
         const signer = await provider.getSigner()
         
-        // 使用自定义地址或默认地址
+        // 优先使用自定义合约地址，否则使用默认合约地址
         const addressToUse = customContractAddress || contractAddress
+        // 创建合约实例，后续可用于读写合约
         const contract = new ethers.Contract(addressToUse, contractABI, signer)
         
-        setProvider(provider)
-        setSigner(signer)
-        setContract(contract)
-        setIsConnected(true)
+        // 更新本地状态
+        setProvider(provider)      // 保存 provider 实例
+        setSigner(signer)          // 保存 signer 实例
+        setContract(contract)      // 保存合约实例
+        setIsConnected(true)       // 标记已连接
         
-        // 获取合约状态
+        // 获取合约的初始状态（如 owner、count 等）
         await fetchContractState()
       } else {
+        // 未检测到 MetaMask，输出错误
         console.error('MetaMask未安装')
       }
     } catch (error) {
+      // 捕获并输出连接过程中的异常
       console.error('连接钱包失败:', error)
     }
   }
@@ -195,13 +216,32 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
     setLoading(true)
     try {
       const amountWei = ethers.parseEther(transferData.amount)
-      const tx = await signer.sendTransaction({
-        to: transferData.to,
-        value: amountWei
-      })
+      
+      let tx
+      
+      // 如果没有data，使用signer发送交易
+      if (!transferData.data.trim()) {
+        tx = await signer.sendTransaction({
+          to: transferData.to,
+          value: amountWei
+        })
+      } else {
+        // 如果有data，使用私钥和JsonRpcProvider发送交易
+        const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_INFURA_URL)
+        const privateKey = process.env.NEXT_PUBLIC_PRIVATE_KEY
+        const wallet = new ethers.Wallet(privateKey as string, provider)
+        
+        const transactionParams: any = {
+          to: transferData.to,
+          value: amountWei,
+          data: stringToHex(transferData.data.trim())
+        }
+        
+        tx = await wallet.sendTransaction(transactionParams)
+      }
       
       await tx.wait()
-      setTransferData({ to: '', amount: '' })
+      setTransferData({ to: '', amount: '', data: '' })
       setOperationStatus({ type: 'success', message: '转账成功' })
       setTimeout(() => setOperationStatus({ type: null, message: '' }), 3000)
     } catch (error) {
@@ -346,6 +386,10 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
     setTransferData(prev => ({ ...prev, to: value }))
   }, 300)
 
+  const debouncedSetTransferData = _.debounce((value: string) => {
+    setTransferData(prev => ({ ...prev, data: value }))
+  }, 300)
+
 
 
   return (
@@ -436,7 +480,7 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-gray-300 mb-3">
-                      转账金额 (ETH)
+                      转账金额 (ETH) A
                     </label>
                     <input
                       type="number"
@@ -445,6 +489,25 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                       className="uniswap-input w-full"
                       onChange={(e) => debouncedSetTransferAmount(e.target.value)}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-3">
+                      携带数据 (可选)
+                    </label>
+                    <textarea
+                      placeholder="输入要携带的数据，将自动转换为16进制..."
+                      rows={3}
+                      className="uniswap-input w-full resize-none"
+                      onChange={(e) => debouncedSetTransferData(e.target.value)}
+                    />
+                    {transferData.data.trim() && (
+                      <div className="text-xs text-gray-400 mt-2">
+                        <div className="font-medium">16进制预览:</div>
+                        <div className="break-all bg-gray-800 p-2 rounded mt-1 text-gray-300">
+                          {stringToHex(transferData.data.trim())}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={handleTransfer}

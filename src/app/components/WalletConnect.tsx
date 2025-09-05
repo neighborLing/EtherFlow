@@ -2,21 +2,55 @@
 
 import { useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useBalance, useSendTransaction, useSwitchChain } from 'wagmi';
-import { parseEther } from 'viem';
+import { parseEther, stringToHex } from 'viem';
 
 export default function WalletConnect() {
-  const { address, isConnected, chain } = useAccount();
-  const { connect, connectors, isPending } = useConnect();
-  const { disconnect } = useDisconnect();
-  const { switchChain } = useSwitchChain();
-  const { data: balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance } = useBalance({
-    address: address,
+  // useAccount hook - 获取当前钱包账户信息
+  const { 
+    address,        // 当前连接的钱包地址 (string | undefined)
+    isConnected,    // 钱包是否已连接 (boolean)
+    chain          // 当前连接的网络链信息 (Chain | undefined)
+  } = useAccount();
+
+  // useConnect hook - 提供钱包连接功能
+  const { 
+    connect,        // 连接钱包的函数，接受连接器参数
+    connectors,     // 可用的钱包连接器列表 (Connector[])
+    isPending       // 连接过程是否正在进行中 (boolean)
+  } = useConnect();
+
+  // useDisconnect hook - 提供钱包断开连接功能
+  const { 
+    disconnect      // 断开钱包连接的函数
+  } = useDisconnect();
+
+  // useSwitchChain hook - 提供网络切换功能
+  const { 
+    switchChain     // 切换网络链的函数，接受链ID参数
+  } = useSwitchChain();
+
+  // useBalance hook - 获取钱包余额信息
+  const { 
+    data: balance,           // 余额数据对象，包含 value、formatted 等属性
+    isLoading: balanceLoading, // 余额加载状态 (boolean)
+    error: balanceError,     // 余额查询错误信息
+    refetch: refetchBalance  // 重新获取余额的函数
+  } = useBalance({
+    address: address,        // 要查询余额的地址
   });
 
-  const [toAddress, setToAddress] = useState('');
-  const [amount, setAmount] = useState('');
+  // 转账表单状态管理
+  const [toAddress, setToAddress] = useState('');  // 接收方地址
+  const [amount, setAmount] = useState('');        // 转账金额
+  const [data, setData] = useState('');            // 转账携带的数据
 
-  const { sendTransaction, isPending: isTransferPending, isSuccess, error } = useSendTransaction({
+  // useSendTransaction hook - 提供发送交易功能
+  const { 
+    sendTransaction,              // 发送交易的函数
+    isPending: isTransferPending, // 交易发送过程中的加载状态
+    isSuccess,                   // 交易是否发送成功
+    error                        // 交易发送过程中的错误信息
+  } = useSendTransaction({
     mutation: {
       onSuccess: () => {
         // 转账成功后刷新余额
@@ -27,25 +61,40 @@ export default function WalletConnect() {
     }
   });
 
+  // 处理转账的函数
   const handleTransfer = () => {
+    // 检查输入是否完整
     if (!toAddress || !amount) return;
     
+    // 将ETH金额转换为Wei单位
     const amountInWei = parseEther(amount);
+    
+    // 检查余额是否足够
     if (balance && amountInWei > balance.value) {
       alert('余额不足！');
       return;
     }
     
     try {
-      sendTransaction({
-        to: toAddress as `0x${string}`,
-        value: amountInWei,
-      });
+      // 准备交易参数
+      const transactionParams: any = {
+        to: toAddress as `0x${string}`,  // 接收方地址，类型断言为0x开头的字符串
+        value: amountInWei,              // 转账金额（Wei单位）
+      };
+      
+      // 如果有数据，则转换为16进制并添加到交易中
+      if (data.trim()) {
+        transactionParams.data = stringToHex(data.trim());
+      }
+      
+      // 发送交易
+      sendTransaction(transactionParams);
     } catch (err) {
       console.error('Transfer failed:', err);
     }
   };
 
+  // 检查余额是否不足的函数
   const isInsufficientBalance = () => {
     if (!balance || !amount) return false;
     try {
@@ -56,13 +105,15 @@ export default function WalletConnect() {
     }
   };
 
+  // 切换到本地网络（链ID: 1337）
   const switchToLocalhost = () => {
     switchChain({ chainId: 1337 });
   };
 
+  // 格式化余额显示的函数
   const formatBalance = (balance: any) => {
     if (!balance) return '0';
-    const balanceInEth = Number(balance.value) / 1e18;
+    const balanceInEth = Number(balance.value) / 1e18;  // 将Wei转换为ETH
     return balanceInEth.toFixed(4); // 保留4位小数
   };
 
@@ -173,7 +224,7 @@ export default function WalletConnect() {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      转账金额 (ETH)
+                      转账金额 (ETH) B
                     </label>
                     {balance && (
                       <button
@@ -199,6 +250,27 @@ export default function WalletConnect() {
                   {balance && amount && (
                     <div className="text-xs text-gray-500 mt-1">
                       剩余: {((Number(balance.value) / 1e18) - parseFloat(amount || '0')).toFixed(6)} ETH
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    携带数据 (可选)
+                  </label>
+                  <textarea
+                    value={data}
+                    onChange={(e) => setData(e.target.value)}
+                    placeholder="输入要携带的数据，将自动转换为16进制..."
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  />
+                  {data.trim() && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      <div className="font-medium">16进制预览:</div>
+                      <div className="break-all bg-gray-100 p-2 rounded mt-1">
+                        {stringToHex(data.trim())}
+                      </div>
                     </div>
                   )}
                 </div>
