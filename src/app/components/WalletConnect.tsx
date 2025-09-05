@@ -49,14 +49,23 @@ export default function WalletConnect() {
     sendTransaction,              // 发送交易的函数
     isPending: isTransferPending, // 交易发送过程中的加载状态
     isSuccess,                   // 交易是否发送成功
-    error                        // 交易发送过程中的错误信息
+    error,                       // 交易发送过程中的错误信息
+    reset                        // 重置状态的函数
   } = useSendTransaction({
     mutation: {
       onSuccess: () => {
         // 转账成功后刷新余额
         setTimeout(() => {
           refetchBalance();
+          // 重置转账状态，允许再次转账
+          reset();
         }, 2000); // 等待2秒让交易确认
+      },
+      onError: () => {
+        // 转账失败后也重置状态
+        setTimeout(() => {
+          reset();
+        }, 1000);
       }
     }
   });

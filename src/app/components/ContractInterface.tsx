@@ -241,7 +241,8 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
       }
       
       await tx.wait()
-      setTransferData({ to: '', amount: '', data: '' })
+      // 转账成功后不清空表单，允许用户再次使用相同参数转账
+      // setTransferData({ to: '', amount: '', data: '' })
       setOperationStatus({ type: 'success', message: '转账成功' })
       setTimeout(() => setOperationStatus({ type: null, message: '' }), 3000)
     } catch (error) {
@@ -509,20 +510,29 @@ const ContractInterface: React.FC<IContractInterfaceProps> = ({
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={handleTransfer}
-                    disabled={loading || !signer}
-                    className="gradient-btn w-full text-lg py-4"
-                  >
-                    {loading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        处理中...
-                      </div>
-                    ) : (
-                      '执行转账'
-                    )}
-                  </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                      onClick={handleTransfer}
+                      disabled={loading || !signer}
+                      className="gradient-btn text-lg py-4"
+                    >
+                      {loading ? (
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          处理中...
+                        </div>
+                      ) : (
+                        '执行转账'
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setTransferData({ to: '', amount: '', data: '' })}
+                      disabled={loading}
+                      className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    >
+                      清空表单
+                    </button>
+                  </div>
                 </div>
               </div>
 
